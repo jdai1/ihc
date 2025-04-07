@@ -1,15 +1,23 @@
 use pyo3::prelude::*;
 use pyo3::types::{IntoPyDict, PyDict, PyInt};
 use std::ffi::CString;
+use lp::cplex::{CPLEXHandler, LPSolveResult};
+
+pub mod lp;
 
 fn main() {
     // test_python_interp();
-    let func = PyFunctionHandler::new();
+    // let func = PyFunctionHandler::new();\
 
-    let a = func.call_incerement();
-    println!("first is {a:?}");
-    let a = func.call_incerement();
-    println!("second is {a:?}");
+    // for i in 0..10 {
+    //     let val = func.call_incerement();
+    //     println!("{i} -- val is {val:?}");
+    // }
+    let handler = CPLEXHandler::new();
+    // let a = func.call_incerement();
+    // println!("first is {a:?}");
+    // let a = func.call_incerement();
+    // println!("second is {a:?}");
 }
 
 struct PyFunctionHandler {
