@@ -74,6 +74,13 @@ class IPInstance:
             self.model.scal_prod(terms=self.usage, coefs=self.costOfTest)
         )
 
+        # add extra constraints for fixed values
+        temp = []
+        self.model.add(temp)
+        for c_temp in temp:
+            self.model.remove(c_temp)
+
+
         sol = self.model.solve()
         cost_celing = self.model.objective_value
         if sol:
