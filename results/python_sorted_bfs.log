@@ -1,0 +1,7 @@
+{"Instance": "25_25_0.5_1.ip", "Time": 0.09, "Result": 30.0, "Solution": "OPT"}
+{"Instance": "50_100_0.5_4.ip", "Time": 138.65, "Result": 129.0, "Solution": "OPT"}
+{"Instance": "50_25_0.5_1.ip", "Time": 0.16, "Result": 71.0, "Solution": "OPT"}
+{"Instance": "25_25_0.25_1.ip", "Time": 0.11, "Result": 57.0, "Solution": "OPT"}
+{"Instance": "25_50_0.5_8.ip", "Time": 1.56, "Result": 79.0, "Solution": "OPT"}
+{"Instance": "50_100_0.5_7.ip", "Time": 156.29, "Result": 103.0, "Solution": "OPT"}
+{"Instance": "50_50_0.5_5.ip", "Time": 0.2, "Result": 59.0, "Solution": "OPT"}
