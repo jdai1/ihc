@@ -184,27 +184,29 @@ class BFSIPSolver:
 
     def get_branch_var_goated(self, assignments: list[int], diff_dis: np.ndarray) -> int:
         # [1, 0, -1]
-        print("\n\ngetting a goated new branch var")
-        print(f"current assignments -- {assignments}")
-        print(f"current diff_dis -- {diff_dis}")
+        # print("\n\ngetting a goated new branch var")
+        # print(f"current assignments -- {assignments}")
+        # print(f"current diff_dis -- {diff_dis}")
         unassigned = [i for i, val in enumerate(assignments) if val == -1]
-        print(f"unassigned -- {unassigned}")
-        print(f"table -- {self.table}")
+        # print(f"unassigned -- {unassigned}")
+        # print(f"table -- {self.table}")
         if not unassigned: return 0
 
         nondiff_dis = 1 - diff_dis
 
         unassigned_rows = self.table[unassigned]
         new_diffs = np.bitwise_and(unassigned_rows, nondiff_dis)
-        print(f"new_diffs -- {new_diffs}")
+        # print(f"new_diffs -- {new_diffs}")
         new_diff_counts = np.sum(new_diffs, axis=1)
+        new_diff_counts = new_diff_counts / self.cost[unassigned]
+        
         # TODO: divide by the cost
 
-        print(f"counts -- {new_diff_counts}")
+        # print(f"counts -- {new_diff_counts}")
 
         best_i = np.argmax(new_diff_counts)
         best_var = unassigned[best_i]
 
-        print(f"RETURNING -- {best_var + 1}")
+        # print(f"RETURNING -- {best_var + 1}")
 
         return best_var + 1
