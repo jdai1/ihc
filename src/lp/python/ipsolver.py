@@ -11,6 +11,39 @@ def is_integral_assignments(assignments: list):
             return False
     return True
 
+class colors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    OKRED = '\033[91m'
+    OKYELLOW = '\033[93m'
+    # OKPURPLE = '\e[0;35m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+class SolveStats:
+    lp_solves: int = 0                # the number of solve requests sent to the LP Solver
+    leaves_pruned: int = 0            #
+    leaves_integral: int = 0          #
+    leaves_better_integral: int = 0
+    leaves_infeasible: int = 0
+
+    def leaves_total(self) -> int:
+        return self.leaves_pruned + self.leaves_integral + self.leaves_infeasible
+    
+    def print(self):
+        print("------------ SEARCH STATS ------------")
+        print(f"* {self.lp_solves} lp solves")
+        print(f"* {self.leaves_total()} total leaf nodes")
+        print(f"    - {self.leaves_pruned} ({round(self.leaves_pruned * 100 / self.leaves_total(), 2)}%) were {colors.OKBLUE}pruned{colors.ENDC}")
+        print(f"    - {self.leaves_infeasible} ({round(self.leaves_infeasible * 100 / self.leaves_total(), 2)}%) were {colors.OKRED}infeasible{colors.ENDC}")
+        print(f"    - {self.leaves_integral} ({round(self.leaves_integral * 100 / self.leaves_total(), 2)}%) were {colors.OKGREEN}integral{colors.ENDC}")
+        print(f"        - {self.leaves_better_integral} ({round(self.leaves_better_integral * 100 / self.leaves_integral, 2)}% of integral) were {colors.HEADER}new best{colors.ENDC}")
+
+
 
 """ Idea: Best-First Search with heuristic that weights cost + # variables assigned """
 
@@ -98,6 +131,7 @@ class BFSIPSolver:
         self.lp_solver = LPSolver(filename=filename)
         self.incumbent_cost: float = math.inf
         self.incumbent_assignment: List[float] = [0.0] * self.num_tests
+        self.stats = SolveStats()
 
         # pre-processing
         table = []
@@ -139,21 +173,27 @@ class BFSIPSolver:
             self.search(branch_var, assignments[:], diff_dis.copy())
             self.search(-branch_var, assignments, diff_dis)
             
+        self.stats.print()
         return self.incumbent_cost
 
     def search(self, branch_var: int, fixed: list[int], diff_dis: np.ndarray):
         fixed[abs(branch_var) - 1] = 1 if branch_var > 0 else 0
         feasible, objective_value, lp_assignments = self.lp_solver.solve(fixed)
+        self.stats.lp_solves += 1
 
         if branch_var > 0:
             diff_dis = diff_dis | self.table[abs(branch_var) - 1]
         
         if not feasible:
+            self.stats.leaves_infeasible += 1
             pass
         elif objective_value > self.incumbent_cost:
+            self.stats.leaves_pruned += 1
             pass 
         elif is_integral_assignments(lp_assignments):
+            self.stats.leaves_integral += 1
             if objective_value < self.incumbent_cost:
+                self.stats.leaves_better_integral += 1
                 self.incumbent_cost = objective_value
                 self.incumbent_assignment = lp_assignments
         else:
