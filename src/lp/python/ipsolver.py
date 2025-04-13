@@ -94,7 +94,7 @@ class BFSIPSolver:
     def __init__(self, filename: str):
         self.num_tests, self.num_diseases, self.cost, self.A = self.data_parse(filename)  # Optional if needed later
         # ((cost, assignment, diff_diseases) pairs for BeFS)
-        self.heap: List[tuple[float, list[int], np.ndarray]] = []
+        self.heap: List[tuple[float, list[int], np.ndarray, list[float]]] = []
         self.lp_solver = LPSolver(filename=filename)
         self.incumbent_cost: float = math.inf
         self.incumbent_assignment: List[float] = [0.0] * self.num_tests
@@ -105,15 +105,6 @@ class BFSIPSolver:
             for j in range(i + 1, self.num_diseases):
                 table.append((self.A[:, i] - self.A[:, j]) ** 2)
         self.table = np.stack(table, axis=1).astype(np.uint8)
-
-        # sort by efficacy
-        # TODO: bitmaps!
-        # 1. calculate bitmaps for each test
-        # 2. (in solve?) maintain current mask of differentiated diseases
-        # 3. 
-        # l = [(np.sum(table[i, :]), i) for i in range(self.num_tests)]
-        # l.sort(key=lambda x: x[0], reverse=True)
-        # self.sorted_tests = [x[1] for x in l]
 
     def data_parse(self, filename: str):
         try:
@@ -136,13 +127,13 @@ class BFSIPSolver:
             exit(1)
 
     def solve(self) -> float:
-        branch_var = self.get_branch_var_goated([-1] * self.num_tests, np.zeros(self.table.shape[1], dtype=np.uint8))
+        branch_var = self.get_branch_var_diff_dis([-1] * self.num_tests, np.zeros(self.table.shape[1], dtype=np.uint8))
         self.search(branch_var, [-1] * self.num_tests, np.zeros(self.table.shape[1], dtype=np.uint8))
         self.search(-branch_var, [-1] * self.num_tests, np.zeros(self.table.shape[1], dtype=np.uint8))
 
         while self.heap:
-            _, assignments, diff_dis = heapq.heappop(self.heap)
-            branch_var = self.get_branch_var_goated(assignments, diff_dis)
+            _, assignments, diff_dis, lp_assignments = heapq.heappop(self.heap)
+            branch_var = self.get_branch_var_diff_dis(assignments, diff_dis)
             if branch_var == 0:
                 continue
             self.search(branch_var, assignments[:], diff_dis.copy())
@@ -166,14 +157,7 @@ class BFSIPSolver:
                 self.incumbent_cost = objective_value
                 self.incumbent_assignment = lp_assignments
         else:
-            heapq.heappush(self.heap, (objective_value, fixed, diff_dis))
-        
-
-    # def get_branch_var_sorted(self, assignments: list[int]) -> int:
-    #     for i in self.sorted_tests:
-    #         if assignments[i] == -1:
-    #             return i + 1
-    #     return 0
+            heapq.heappush(self.heap, (objective_value, fixed, diff_dis, lp_assignments))
     
 
     def get_branch_var_sequential(self, assignments: list[int]) -> int:
@@ -182,31 +166,42 @@ class BFSIPSolver:
                 return i + 1
         return 0
 
-    def get_branch_var_goated(self, assignments: list[int], diff_dis: np.ndarray) -> int:
+    def get_branch_var_diff_dis(self, assignments: list[int], diff_dis: np.ndarray) -> int:
         # [1, 0, -1]
-        # print("\n\ngetting a goated new branch var")
-        # print(f"current assignments -- {assignments}")
-        # print(f"current diff_dis -- {diff_dis}")
         unassigned = [i for i, val in enumerate(assignments) if val == -1]
-        # print(f"unassigned -- {unassigned}")
-        # print(f"table -- {self.table}")
         if not unassigned: return 0
 
         nondiff_dis = 1 - diff_dis
 
         unassigned_rows = self.table[unassigned]
         new_diffs = np.bitwise_and(unassigned_rows, nondiff_dis)
-        # print(f"new_diffs -- {new_diffs}")
-        new_diff_counts = np.sum(new_diffs, axis=1)
-        new_diff_counts = new_diff_counts / self.cost[unassigned]
-        
-        # TODO: divide by the cost
 
-        # print(f"counts -- {new_diff_counts}")
+        new_diff_counts = np.sum(new_diffs, axis=1)
+
+        # TODO: Change heuristic to not be super greedy on cost
+        new_diff_counts = new_diff_counts / self.cost[unassigned]
 
         best_i = np.argmax(new_diff_counts)
         best_var = unassigned[best_i]
 
-        # print(f"RETURNING -- {best_var + 1}")
+        return best_var + 1
+
+    def get_branch_var_fractional(self, assignments: list[int], diff_dis: np.ndarray, lp_assignments: list[float]) -> int:
+        # [1, 0, -1]
+        unassigned = [i for i, (is_assigned, value) in enumerate(zip(assignments, lp_assignments)) if is_assigned == -1 or value]
+        if not unassigned: return 0
+
+        nondiff_dis = 1 - diff_dis
+
+        unassigned_rows = self.table[unassigned]
+        new_diffs = np.bitwise_and(unassigned_rows, nondiff_dis)
+
+        new_diff_counts = np.sum(new_diffs, axis=1)
+
+        # TODO: Change heuristic to not be super greedy on cost
+        new_diff_counts = new_diff_counts / self.cost[unassigned]
+
+        best_i = np.argmax(new_diff_counts)
+        best_var = unassigned[best_i]
 
         return best_var + 1
