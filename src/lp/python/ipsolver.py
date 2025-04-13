@@ -1,13 +1,19 @@
 from typing import List
 import math
 
+
+
 from lpsolver import LPSolver
 import heapq
 import numpy as np
+import time
+
+def is_not_integer(x):
+    return not isinstance(x, int) and not x.is_integer()
 
 def is_integral_assignments(assignments: list):
     for x in assignments:
-        if not isinstance(x, int) and not x.is_integer():
+        if is_not_integer(x):
             return False
     return True
 
@@ -30,13 +36,18 @@ class SolveStats:
     leaves_integral: int = 0          #
     leaves_better_integral: int = 0
     leaves_infeasible: int = 0
+    heap_solves_skipped: int = 0
 
     def leaves_total(self) -> int:
         return self.leaves_pruned + self.leaves_integral + self.leaves_infeasible
     
     def print(self):
+        if self.leaves_total() == 0:
+            print("no leaves right now, thank you, come again")
+            return
+        
         print("------------ SEARCH STATS ------------")
-        print(f"* {self.lp_solves} lp solves")
+        print(f"* {self.lp_solves} lp solves ({self.heap_solves_skipped} skipped)")
         print(f"* {self.leaves_total()} total leaf nodes")
         print(f"    - {self.leaves_pruned} ({round(self.leaves_pruned * 100 / self.leaves_total(), 2)}%) were {colors.OKBLUE}pruned{colors.ENDC}")
         print(f"    - {self.leaves_infeasible} ({round(self.leaves_infeasible * 100 / self.leaves_total(), 2)}%) were {colors.OKRED}infeasible{colors.ENDC}")
@@ -73,6 +84,8 @@ class DFSIPSolver:
         self.stack.append(-branch_var)
         self.stack.append(branch_var)
 
+
+        
         while self.stack:
             next_var = self.stack.pop()
             self.assign(next_var)
@@ -161,15 +174,34 @@ class BFSIPSolver:
             exit(1)
 
     def solve(self) -> float:
-        branch_var = self.get_branch_var_diff_dis([-1] * self.num_tests, np.zeros(self.table.shape[1], dtype=np.uint8))
+        # branch_var = self.get_branch_var_diff_dis([-1] * self.num_tests, np.zeros(self.table.shape[1], dtype=np.uint8))
+        # branch_var = self.get_branch_var_fractional([-1] * self.num_tests, np.zeros(self.table.shape[1], dtype=np.uint8), [0.5] * self.num_tests)
+        branch_var = self.get_branch_var_lp([-1] * self.num_tests, np.zeros(self.table.shape[1], dtype=np.uint8), [0.5] * self.num_tests)
         self.search(branch_var, [-1] * self.num_tests, np.zeros(self.table.shape[1], dtype=np.uint8))
         self.search(-branch_var, [-1] * self.num_tests, np.zeros(self.table.shape[1], dtype=np.uint8))
 
+        last_print = time.time()
         while self.heap:
-            _, assignments, diff_dis, lp_assignments = heapq.heappop(self.heap)
-            branch_var = self.get_branch_var_diff_dis(assignments, diff_dis)
-            if branch_var == 0:
-                continue
+            current = time.time()
+            if current - last_print > 5:
+                last_print = time.time()
+                # print(f"heap len -- {len(self.heap)}")
+                self.stats.print()
+            
+            parent_obj_val, assignments, diff_dis, lp_assignments = heapq.heappop(self.heap)
+            # branch_var = self.get_branch_var_diff_dis(assignments, diff_dis)
+            # branch_var = self.get_branch_var_fractional(assignments, diff_dis, lp_assignments)
+            branch_var = self.get_branch_var_lp(assignments, diff_dis, lp_assignments)
+            # print("lp_assignemnts: ", lp_assignments)
+            # print("lp_assignemnts num 0s: ", len([x for x in lp_assignments if x == 0]))
+            # print("value of thing we're assigning:", lp_assignments[branch_var - 1], "num assignments:", len([x for x in assignments if x != -1]), ", branch_var: ", branch_var)
+
+            # print("parent_obj_val:", parent_obj_val)
+            if self.incumbent_cost < parent_obj_val:
+                # print(f"paren val {parent_obj_val} is worse than incumbent {self.incumbent_cost}")
+                self.stats.heap_solves_skipped += 1
+                continue 
+            
             self.search(branch_var, assignments[:], diff_dis.copy())
             self.search(-branch_var, assignments, diff_dis)
             
@@ -191,8 +223,10 @@ class BFSIPSolver:
             self.stats.leaves_pruned += 1
             pass 
         elif is_integral_assignments(lp_assignments):
+            # print("integral lp_assignments:", lp_assignments)
             self.stats.leaves_integral += 1
             if objective_value < self.incumbent_cost:
+                # print(f"{colors.OKBLUE}New incumbent: {objective_value}{colors.ENDC}")
                 self.stats.leaves_better_integral += 1
                 self.incumbent_cost = objective_value
                 self.incumbent_assignment = lp_assignments
@@ -228,20 +262,31 @@ class BFSIPSolver:
 
     def get_branch_var_fractional(self, assignments: list[int], diff_dis: np.ndarray, lp_assignments: list[float]) -> int:
         # [1, 0, -1]
-        unassigned = [i for i, (is_assigned, value) in enumerate(zip(assignments, lp_assignments)) if is_assigned == -1 or value]
-        if not unassigned: return 0
-
+        unassigned_and_fractional = [i for i, (is_assigned, value) in enumerate(zip(assignments, lp_assignments)) if is_assigned == -1 and is_not_integer(value)]
         nondiff_dis = 1 - diff_dis
 
-        unassigned_rows = self.table[unassigned]
+        unassigned_rows = self.table[unassigned_and_fractional]
         new_diffs = np.bitwise_and(unassigned_rows, nondiff_dis)
 
         new_diff_counts = np.sum(new_diffs, axis=1)
 
-        # TODO: Change heuristic to not be super greedy on cost
-        new_diff_counts = new_diff_counts / self.cost[unassigned]
+        new_diff_counts = new_diff_counts
 
         best_i = np.argmax(new_diff_counts)
-        best_var = unassigned[best_i]
+        best_var = unassigned_and_fractional[best_i]
 
         return best_var + 1
+
+    def get_branch_var_lp(self, assignments: list[int], diff_dis: np.ndarray, lp_assignments: list[float]) -> int:
+        # [1, 0, -1]
+        closest_to_one = -1
+        distance_to_one = 1
+        for i, val in enumerate(lp_assignments):
+            if assignments[i] != -1:
+                continue
+            if 1 - val <= distance_to_one:
+                distance_to_one = 1 - val
+                closest_to_one = i
+        # print(closest_to_one)
+
+        return closest_to_one + 1

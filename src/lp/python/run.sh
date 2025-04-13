@@ -11,9 +11,9 @@ then
 fi
 
 input=$1
-source p4_venv/bin/activate || exit 1
+# source p4_venv/bin/activate || exit 1
 # change this to point to your local installation
 # CHANGE it back to this value before submitting
-export DOCPLEX_COS_LOCATION=/course/cs2951o/ilog/CPLEX_Studio2211/CPLEX_Studio2211
+# export DOCPLEX_COS_LOCATION=/course/cs2951o/ilog/CPLEX_Studio2211/CPLEX_Studio2211
 # run the solver
-python3.9 src/main.py $input
+python3 main.py $input

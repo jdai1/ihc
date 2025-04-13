@@ -30,6 +30,7 @@ class LPSolver:
 
         # establishing model & constraints
         self.model = Model()
+        self.model.context.cplex_parameters.threads = 1
 
         # decision variables
         self.usage = self.model.continuous_var_list(self.numTests, 0, 1)
@@ -60,9 +61,9 @@ class LPSolver:
             )
 
         sol = self.model.solve()
-
-        for constr in fixed_value_constraints:
-            self.model.remove_constraint(constr)
+        self.model.remove_constraints(fixed_value_constraints)
+        # for constr in fixed_value_constraints:
+            # self.model.remove_constraint(constr)
         if sol:
             return (
                 True,
