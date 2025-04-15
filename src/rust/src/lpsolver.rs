@@ -1,22 +1,20 @@
 use cplex_rs::{
-    Constraint, ConstraintType, Environment, ObjectiveType, Problem, ProblemType, Variable,
-    VariableId, VariableType
+    Constraint, ConstraintType, Environment, ObjectiveType, Problem, ProblemType, Solution, Variable, VariableId, VariableType
 };
 use cplex_rs::parameters::Threads;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::ffi::{c_int, CString};
-pub use cplex_rs::ffi;
-use ffi::CPXchgbds;
 
-struct ProblemInstance {
-    num_tests: usize,
-    num_diseases: usize,
+use crate::ipsolver::common::FixedStatus;
+
+pub struct ProblemInstance {
+    pub num_tests: usize,
+    pub num_diseases: usize,
     cost: Vec<usize>,
     A: Vec<Vec<usize>>,
 }
 
-fn parse_data_file(filename: &str) -> Result<ProblemInstance, anyhow::Error> {
+pub fn parse_data_file(filename: &str) -> Result<ProblemInstance, anyhow::Error> {
     let file = File::open(filename)?;
     let mut lines = BufReader::new(file).lines();
 
@@ -116,21 +114,25 @@ impl LPSolver {
         }
     }
 
-    pub fn solve(&mut self, assignments: &Vec<i32>) {
+    pub fn solve(&mut self, assignments: &Vec<FixedStatus>) -> cplex_rs::Result<Solution> {
         assignments.iter().enumerate().for_each(|(i, &val)| {
-            if val != -1 {
+            if val == FixedStatus::Present {
                 self.lp_problem.fix_variable(self.var_ids[i], 1.0).unwrap();
+            } else if val == FixedStatus::Absent {
+                self.lp_problem.fix_variable(self.var_ids[i], 0.0).unwrap();
             }
         });
         
-        let solution = self.lp_problem.solve_as(ProblemType::Linear).unwrap();
-
+        let solution = self.lp_problem.solve_as(ProblemType::Linear);
         assignments.iter().enumerate().for_each(|(i, &val)| {
-            if val != -1 {
+            if val != FixedStatus::Unassigned {
                 self.lp_problem.unfix_variable(self.var_ids[i], 0.0, 1.0).unwrap();
             }
         });
 
-        println!("{:?}", solution);
+        // TODO: think about how to add and unadd variables in more efficient way
+
+        // println!("{:?}", solution);
+        solution
     }
 }

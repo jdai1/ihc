@@ -1,0 +1,14 @@
+{"Instance":"100_100_0.25_1.ip","Result":153.0,"Solution":"OPT","Time":52.477418125}
+{"Instance":"100_100_0.25_3.ip","Result":96.0,"Solution":"OPT","Time":9.88588325}
+{"Instance":"100_100_0.5_3.ip","Result":71.0,"Solution":"OPT","Time":5.331045583}
+{"Instance":"100_100_0.5_9.ip","Result":74.0,"Solution":"OPT","Time":4.330486958}
+{"Instance":"100_200_0.5_5.ip","Result":86.0,"Solution":"OPT","Time":29.339144416}
+{"Instance":"100_200_0.5_6.ip","Result":69.0,"Solution":"OPT","Time":13.857203542}
+{"Instance":"100_50_0.5_2.ip","Result":72.0,"Solution":"OPT","Time":0.643698375}
+{"Instance":"25_25_0.25_1.ip","Result":57.0,"Solution":"OPT","Time":0.025622167}
+{"Instance":"25_25_0.5_1.ip","Result":30.0,"Solution":"OPT","Time":0.018607917}
+{"Instance":"25_50_0.5_8.ip","Result":77.0,"Solution":"OPT","Time":0.414122084}
+{"Instance":"50_100_0.5_4.ip","Result":103.0,"Solution":"OPT","Time":4.689156166}
+{"Instance":"50_100_0.5_7.ip","Result":92.0,"Solution":"OPT","Time":4.070591292}
+{"Instance":"50_25_0.5_1.ip","Result":37.0,"Solution":"OPT","Time":0.04527875}
+{"Instance":"50_50_0.5_5.ip","Result":53.0,"Solution":"OPT","Time":0.151914292}

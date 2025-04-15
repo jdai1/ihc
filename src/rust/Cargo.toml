@@ -10,4 +10,5 @@ build = "build.rs"
 anyhow = "1.0.97"
 cplex-rs = { path = "./lib/cplex-rs" }
 serde_json = "1.0.140"
+crossbeam = "0.8.4"
 which = "7.0.3"

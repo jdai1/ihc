@@ -16,4 +16,4 @@ input=$1
 # CHANGE it back to this value before submitting
 # export DOCPLEX_COS_LOCATION=/course/cs2951o/ilog/CPLEX_Studio2211/CPLEX_Studio2211
 # run the solver
-python3 main.py $input
+./runRust.sh $input
