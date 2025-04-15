@@ -1,0 +1,1 @@
+DYLD_LIBRARY_PATH=/Applications/CPLEX_Studio2211/cplex/bin/x86-64_osx CPLEX_PATH=/Applications/CPLEX_Studio2211/cplex cargo run --target x86_64-apple-darwin $1

@@ -9,17 +9,22 @@ import ast
 def lpsolve():
     filepath = sys.argv[1]
     assignments = ast.literal_eval(sys.argv[2])
-    
+    assignments = [-1] * 25
     watch = Timer()
     watch.start()
     solver = LPSolver(filepath)
-    feasible, objective_value, assignments = solver.solve(assignments)
+    for i in range(100):
+        feasible, objective_value, assignments = solver.solve(assignments)
+        print(feasible, objective_value)
+        print(" ".join([str(x) for x in assignments]))
     watch.stop()
 
-    print("true" if feasible else "false")
-    if feasible:
-        print(objective_value)
-        print(" ".join([str(x) for x in assignments]))
+    print(round(watch.getElapsed(), 2))
+
+    # print("true" if feasible else "false")
+    # if feasible:
+    #     print(objective_value)
+    #     print(" ".join([str(x) for x in assignments]))
 
 
 def ipsolve():
@@ -61,7 +66,7 @@ def test():
     for test_case in test_cases:
         watch = Timer()
         watch.start()
-        solver = BFSIPSolver(f"../../../input/{test_case}")
+        solver = BFSIPSolver(f"../input/{test_case}")
         sol = solver.solve()
         watch.stop()
 
@@ -77,5 +82,6 @@ def test():
 
 if __name__ == "__main__":
 	# test()
-    ipsolve()
+    # ipsolve()
+    lpsolve()
     

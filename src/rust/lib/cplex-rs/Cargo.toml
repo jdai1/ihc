@@ -1,0 +1,14 @@
+[package]
+name = "cplex-rs"
+description = "Binding of IBM Cplex library"
+authors = ["Matteo Biggio"]
+version = "0.1.7"
+license = "MIT OR Apache-2.0"
+edition = "2021"
+keywords = ["optimization", "binding", "cplex"]
+repository = "https://github.com/mbiggio/cplex-rs"
+
+[dependencies]
+ffi = { package = "cplex-rs-sys", path = "../cplex-rs-sys", version = "0.1" }
+thiserror = "1.0"
+log = "0.4"

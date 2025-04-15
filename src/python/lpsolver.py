@@ -30,7 +30,7 @@ class LPSolver:
 
         # establishing model & constraints
         self.model = Model()
-        self.model.context.cplex_parameters.threads = 1
+        # self.model.context.cplex_parameters.threads = 1
 
         # decision variables
         self.usage = self.model.continuous_var_list(self.numTests, 0, 1)
