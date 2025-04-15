@@ -47,7 +47,7 @@ pub use solver::IPSolver;
 
 mod solver {
     use crate::ipsolver::get_branch_var;
-    use std::{collections::BinaryHeap, thread::JoinHandle};
+    use std::{collections::BinaryHeap, thread::{current, JoinHandle}};
     use crate::lpsolver::{self, LPSolver, ProblemInstance};
 
     use super::{common::{FixedStatus, Node}, worker::{Worker, WorkerStats}};
@@ -65,7 +65,19 @@ mod solver {
         NewActiveNode(Node)
     }
 
+    #[derive(Debug)]
+    pub struct SolverStats {
+        pub max_heap_size: usize,
+    }
+
+    impl Default for SolverStats {
+        fn default() -> Self {
+            SolverStats { max_heap_size: 0 }
+        }
+    }
+
     pub struct IPSolver {
+        solver_stats: SolverStats,
         active_nodes: BinaryHeap<Node>,
         problem_instance: ProblemInstance,
         lp_solver: lpsolver::LPSolver,
@@ -89,6 +101,7 @@ mod solver {
             
             IPSolver {
                 active_nodes: BinaryHeap::new(),
+                solver_stats: SolverStats::default(),
                 thread_pool: Self::init_thread_pool(filename, work_channel_recv, work_response_send),
                 work_channel_send,
                 work_response_recv,
@@ -176,16 +189,30 @@ mod solver {
                     }
                 } 
 
+                if self.active_nodes.len() > self.solver_stats.max_heap_size {
+                    self.solver_stats.max_heap_size = self.active_nodes.len();
+                }
+
                 if (in_flight_nodes == 0 && self.active_nodes.is_empty()) {
                     println!("I think im done w/ enc {:?}!", self.current_incumbent);
-                    return (self.current_incumbent_obj_val, self.current_incumbent.unwrap().lp_assignments);
+                    drop(self.work_channel_send);
+                    break;
                 }
 
                 // println!("nothing else to recv! back to top!!");
 
             }
 
-            todo!()
+            println!("ALL DONE CLEANING UP");
+
+            let worker_stats = self.thread_pool.into_iter().map(|join_handle|{
+                join_handle.join().unwrap()
+            }).collect::<Vec<_>>();
+
+            println!("my stats are {:?}", self.solver_stats);
+            println!("worker stats are {:?}", worker_stats);
+            
+            return (self.current_incumbent_obj_val, self.current_incumbent.unwrap().lp_assignments);
 
         }
 
@@ -246,18 +273,33 @@ mod solver {
             work_channel_recv: crossbeam::channel::Receiver<WorkOrder>,
             work_response_send: crossbeam::channel::Sender<WorkResponse>
         ) -> Vec<JoinHandle<WorkerStats>> {
-            let mut handles = Vec::new();
 
-            for i in 0..IPSolver::NUM_WORKERS {
+            let core_ids = core_affinity::get_core_ids().unwrap();
+
+            let mine = core_ids.first().unwrap();
+            let res = core_affinity::set_for_current(*mine);
+            println!("binding thread {:?} to core {:?} had res {res:?}", current().id(), mine);
+
+            let handles = core_ids.iter().skip(1).enumerate().map(|(worker_id, core_id)|{
                 let new_work_channel_recv = work_channel_recv.clone();
                 let new_work_response_send = work_response_send.clone();
-                println!("making worker id {i:?}");
+
+                println!("making worker id {worker_id:?}");
+
+                
+
+                println!("bound worker {worker_id:?} to core {core_id:?}");
                 let filename = filename.to_string();
-                let jh = std::thread::spawn(move ||{
-                    Worker::new(i, new_work_channel_recv, new_work_response_send, LPSolver::new(&filename)).run()
-                });
-                handles.push(jh);
-            }
+                let new_core = core_id.to_owned();
+                std::thread::spawn(move ||{
+                    let res = core_affinity::set_for_current(new_core);
+                    // will fail for macOS but not on linux i think...
+
+                    println!("binding thread {:?} to core {:?} had res {res:?}", current().id(), new_core);
+
+                    Worker::new(worker_id, new_work_channel_recv, new_work_response_send, LPSolver::new(&filename)).run()
+                })
+            }).collect::<Vec<_>>();
 
             handles
         }
@@ -304,6 +346,9 @@ fn get_branch_var(fixed: &Vec<FixedStatus>, lp_assignments: &Vec<f64>) -> usize 
 }
 
 mod worker {
+    use std::time::Duration;
+    use std::time::Instant;
+
     use crossbeam::channel::RecvError;
 
     use crate::lpsolver::LPSolver;
@@ -314,12 +359,14 @@ mod worker {
 
     #[derive(Debug)]
     pub struct WorkerStats {
-        nodes_visited: usize,
+        pub solves: usize,
+        pub waiting_for_orders: Duration,
+        pub lp_solving: Duration,
     }
 
     impl std::default::Default for WorkerStats {
         fn default() -> Self {
-            WorkerStats { nodes_visited: 0 }
+            WorkerStats { solves: 0, waiting_for_orders: Duration::from_secs(0), lp_solving: Duration::from_secs(0) }
         }
     }
 
@@ -344,10 +391,12 @@ mod worker {
         pub fn run(mut self) -> WorkerStats {
             loop {
                 // println!("worker id {} -- waiting for work", self.id);
+                let start_wait = Instant::now();
                 let order = match self.work_channel_recv.recv() {
                     Ok(order) => order,
                     Err(e) => return self.stats,
                 };
+                self.stats.waiting_for_orders += start_wait.elapsed();
                 // println!("worker id {} -- got work order {:?}", self.id, order);
                 match order {
                     WorkOrder::VisitNode(node) => {
@@ -377,7 +426,13 @@ mod worker {
         fn search(&mut self, branch_assignment: (usize, FixedStatus), mut fixed: Vec<FixedStatus>) -> WorkResponse {
             fixed[branch_assignment.0] = branch_assignment.1; // update the fixed 
 
-            let solution = match self.lp_solver.solve(&fixed) {
+            self.stats.solves += 1;
+
+            let start_solve = Instant::now();
+            let res = self.lp_solver.solve(&fixed);
+            self.stats.lp_solving += start_solve.elapsed();
+            
+            let solution = match res {
                 Err(e) => {
                     match e {
                         cplex_rs::errors::Error::Cplex(c) => {
