@@ -24,14 +24,16 @@ pub mod common {
 
         // noise
         pub noise: f64,
+
+        pub depth: i32,
     }
 
     impl Node {
-        pub fn new(objective_val: f64, fixed: Vec<FixedStatus>, lp_assignments: Vec<f64>) -> Self {
+        pub fn new(objective_val: f64, fixed: Vec<FixedStatus>, lp_assignments: Vec<f64>, depth: i32) -> Self {
             let normal = Normal::new(0.0, 2.0).unwrap();
             let mut rng = thread_rng();
             let noise: f64 = normal.sample(&mut rng);
-            Node { objective_val, fixed, lp_assignments, noise }
+            Node { objective_val, fixed, lp_assignments, noise, depth }
         }
 
         pub fn objective_value(&self) -> f64 { self.objective_val }
@@ -41,16 +43,16 @@ pub mod common {
 
     impl PartialOrd for Node {
         fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-            let other_val = other.objective_val + other.noise;
-            let self_val = self.objective_val + self.noise;
+            let other_val = (other.objective_val + other.noise) * 0.9_f64.powi(other.depth);
+            let self_val = (self.objective_val + self.noise) * 0.9_f64.powi(self.depth);
             other_val.partial_cmp(&self_val)
         }
     }
 
     impl Ord for Node {
         fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-            let other_val = other.objective_val + other.noise;
-            let self_val = self.objective_val + self.noise;
+            let other_val = (other.objective_val + other.noise) * 0.9_f64.powi(other.depth);
+            let self_val = (self.objective_val + self.noise) * 0.9_f64.powi(self.depth);
             other_val.total_cmp(&self_val)
         }
     }
@@ -105,7 +107,7 @@ mod solver {
     
     impl IPSolver {
         const NUM_WORKERS: usize = 8;
-        
+
         pub fn new(filename: &str) -> Self {
             // solve first thing ourselves and then add to active_nodes
             let (work_channel_send, work_channel_recv) = crossbeam::channel::unbounded();
@@ -267,7 +269,7 @@ mod solver {
 
                 let is_integral = solution.variable_values().into_iter().all(|f|f.fract() == 0.0);
                 // println!("is_integral: {}", is_integral);
-                let this_node = Node::new(solution.objective_value(), fixed, solution.variable_values().to_vec());
+                let this_node = Node::new(solution.objective_value(), fixed, solution.variable_values().to_vec(), 0);
 
                 if is_integral {
                     // integral solution
@@ -432,14 +434,14 @@ mod worker {
         pub fn branch_and_visit_node(&mut self, node: Node) -> Vec<WorkResponse> {
 
             let branch_var = get_branch_var(&node.fixed, &node.lp_assignments);
-            let a = self.search((branch_var, FixedStatus::Present), node.fixed.clone());
-            let b = self.search((branch_var, FixedStatus::Absent), node.fixed);
+            let a = self.search((branch_var, FixedStatus::Present), node.fixed.clone(), node.depth);
+            let b = self.search((branch_var, FixedStatus::Absent), node.fixed, node.depth);
 
             // return the work response from each subtree
             vec![a, b]
         }
 
-        fn search(&mut self, branch_assignment: (usize, FixedStatus), mut fixed: Vec<FixedStatus>) -> WorkResponse {
+        fn search(&mut self, branch_assignment: (usize, FixedStatus), mut fixed: Vec<FixedStatus>, depth: i32) -> WorkResponse {
             fixed[branch_assignment.0] = branch_assignment.1; // update the fixed 
 
             self.stats.solves += 1;
@@ -466,7 +468,7 @@ mod worker {
             if let Some(solution) = solution {
                 let is_integral = solution.variable_values().into_iter().all(|f|f.fract() == 0.0);
 
-                let this_node = Node::new(solution.objective_value(), fixed, solution.variable_values().to_vec());
+                let this_node = Node::new(solution.objective_value(), fixed, solution.variable_values().to_vec(), depth + 1);
 
                 if is_integral {
                     return WorkResponse::IntegralSolution(this_node);
@@ -493,14 +495,14 @@ mod test {
     #[test]
     // ordering is the opposite of what you'd expect bc we only have max heap
     fn ordering_test() {
-        let a = common::Node::new(1.0, vec![], vec![]);
-        let b = common::Node::new(1.0001, vec![], vec![]);
+        let a = common::Node::new(1.0, vec![], vec![], 0);
+        let b = common::Node::new(1.0001, vec![], vec![], 0);
         assert!(a > b);
 
-        let c = common::Node::new(0.9, vec![], vec![]);
+        let c = common::Node::new(0.9, vec![], vec![], 0);
         assert!(c > a && c > b);
 
-        let d = common::Node::new(0.9, vec![], vec![]);
+        let d = common::Node::new(0.9, vec![], vec![], 0);
         assert!(c.cmp(&d) == Ordering::Equal);
     }
 }
