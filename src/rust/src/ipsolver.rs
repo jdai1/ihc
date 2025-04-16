@@ -278,6 +278,7 @@ mod solver {
             work_response_send: crossbeam::channel::Sender<WorkResponse>
         ) -> Vec<JoinHandle<WorkerStats>> {
 
+            // TODO: GET RID OF CORE AFFINITY
             let core_ids = core_affinity::get_core_ids().unwrap();
 
             let mine = core_ids.first().unwrap();
@@ -296,10 +297,10 @@ mod solver {
                 let filename = filename.to_string();
                 let new_core = core_id.to_owned();
                 std::thread::spawn(move ||{
-                    let res = core_affinity::set_for_current(new_core);
+                    // let res = core_affinity::set_for_current(new_core);
                     // will fail for macOS but not on linux i think...
 
-                    println!("binding worker thread {:?} to core {:?} (res {res:?})", current().id(), new_core);
+                    // println!("binding worker thread {:?} to core {:?} (res {res:?})", current().id(), new_core);
 
                     Worker::new(worker_id, new_work_channel_recv, new_work_response_send, LPSolver::new(&filename)).run()
                 })

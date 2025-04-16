@@ -33,7 +33,7 @@ fn main() {
         let sol_dict = json!({
             "Instance": filename,
             "Time": (duration.as_secs_f64() * 100.0).round() / 100.0,
-            "Result": res.0,
+            "Result": res.0.round(),
             "Solution": "OPT"
         });
     
