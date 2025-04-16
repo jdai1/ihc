@@ -69,7 +69,7 @@ mod solver {
 
     #[derive(Debug)]
     pub enum WorkOrder {
-        VisitNode(Node, usize),
+        VisitNode(Node, usize, Option<f64>),
         NoMoreWork,
     }
 
@@ -174,7 +174,11 @@ mod solver {
                     if let Some(best_node) = self.active_nodes.pop() {
                         if (best_node.objective_val < self.current_incumbent_obj_val) {
                             // if better than current inc, enq to workqueue
-                            self.work_channel_send.send(WorkOrder::VisitNode(best_node, 0));
+                            let res = match self.current_incumbent_obj_val {
+                                f64::MAX => None,
+                                v => Some(v),
+                            };
+                            self.work_channel_send.send(WorkOrder::VisitNode(best_node, 0, res));
                             in_flight_nodes += 2; // bc we should get two responses from it...
                         } else {
                             // FIXME: think this is safe but should double check...
@@ -264,7 +268,7 @@ mod solver {
             // println!("Fixing {} to be {:?}", branch_assignment.0, branch_assignment.1);
             // println!("Fixed: {:?}", fixed);
             // call solve
-            let solution = self.lp_solver.solve(&fixed);
+            let solution = self.lp_solver.solve(&fixed, None, None);
 
             let solution = match solution {
                 Err(e) => {
@@ -314,7 +318,7 @@ mod solver {
         fn init_thread_pool(
             filename: &str,
             work_channel_recv: crossbeam::channel::Receiver<WorkOrder>,
-            work_response_send: crossbeam::channel::Sender<WorkResponse>
+            work_response_send: crossbeam::channel::Sender<WorkResponse>,
         ) -> Vec<JoinHandle<WorkerStats>> {
 
             let core_ids = core_affinity::get_core_ids().unwrap();
@@ -416,6 +420,7 @@ mod worker {
         id: usize,
         stats: WorkerStats,
         lp_solver: LPSolver,
+        best_obj_so_far: Option<f64>,
         work_channel_recv: crossbeam::channel::Receiver<WorkOrder>,
         work_response_send: crossbeam::channel::Sender<WorkResponse>,
     }
@@ -427,7 +432,7 @@ mod worker {
             work_response_send: crossbeam::channel::Sender<WorkResponse>,
             lp_solver: LPSolver,
         ) -> Self {
-            Worker { id, stats: WorkerStats::default(), work_channel_recv, work_response_send, lp_solver }
+            Worker { id, stats: WorkerStats::default(), work_channel_recv, work_response_send, lp_solver, best_obj_so_far: None }
         }
 
         pub fn run(mut self) -> WorkerStats {
@@ -441,7 +446,16 @@ mod worker {
                 self.stats.waiting_for_orders += start_wait.elapsed();
                 // println!("worker id {} -- got work order {:?}", self.id, order);
                 match order {
-                    WorkOrder::VisitNode(node, depth) => {
+                    WorkOrder::VisitNode(node, depth, best_obj_so_far) => {
+                        match (self.best_obj_so_far, best_obj_so_far) {
+                            (Some(a), Some(b)) if a > b => {
+                                self.best_obj_so_far = Some(b)
+                            },
+                            (None, Some(b)) => {
+                                self.best_obj_so_far = Some(b)
+                            }
+                            _ => (),
+                        }
                         let vec_res = self.branch_and_visit_node(node, depth);
                         for res in vec_res {
                             // println!("worker id {} -- sending response {:?}", self.id, res);
@@ -460,20 +474,20 @@ mod worker {
             println!("worker {:?} -- branching on node w/ obj {:?}", self.id, node.objective_val);
 
             let branch_var = get_branch_var(&node.fixed, &node.lp_assignments);
-            let a = self.search((branch_var, FixedStatus::Present), node.fixed.clone(), node.depth);
-            let b = self.search((branch_var, FixedStatus::Absent), node.fixed, node.depth);
+            let a = self.search((branch_var, FixedStatus::Present), node.fixed.clone(), node.depth, node.objective_val);
+            let b = self.search((branch_var, FixedStatus::Absent), node.fixed, node.depth, node.objective_val);
 
             // return the work response from each subtree
             vec![a, b]
         }
 
-        fn search(&mut self, branch_assignment: (usize, FixedStatus), mut fixed: Vec<FixedStatus>, depth: i32) -> WorkResponse {
+        fn search(&mut self, branch_assignment: (usize, FixedStatus), mut fixed: Vec<FixedStatus>, depth: i32, parent_obj: f64) -> WorkResponse {
             fixed[branch_assignment.0] = branch_assignment.1; // update the fixed 
 
             self.stats.solves += 1;
 
             let start_solve = Instant::now();
-            let res = self.lp_solver.solve(&fixed);
+            let res = self.lp_solver.solve(&fixed, Some(parent_obj), self.best_obj_so_far);
             self.stats.lp_solving += start_solve.elapsed();
 
             let solution = match res {

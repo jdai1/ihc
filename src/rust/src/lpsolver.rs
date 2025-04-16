@@ -114,7 +114,8 @@ impl LPSolver {
         }
     }
 
-    pub fn solve(&mut self, assignments: &Vec<FixedStatus>) -> cplex_rs::Result<Solution> {
+    pub fn solve(&mut self, assignments: &Vec<FixedStatus>, lb: Option<f64>, ub: Option<f64>) -> cplex_rs::Result<Solution> {
+        println!("thread {:?} -- solving with cost bounds [{lb:?}, {ub:?}]", std::thread::current().id());
         assignments.iter().enumerate().for_each(|(i, &val)| {
             if val == FixedStatus::Present {
                 self.lp_problem.fix_variable(self.var_ids[i], 1.0).unwrap();
@@ -122,6 +123,19 @@ impl LPSolver {
                 self.lp_problem.fix_variable(self.var_ids[i], 0.0).unwrap();
             }
         });
+
+        let res = if let Some(lb) = lb {
+            let ub_const = self.lp_problem.add_constraint(Constraint::new(ConstraintType::GreaterThanEq, lb, None, var_and_coeffs)).unwrap();
+            Some(ub_const)
+        } else { None };
+        match lb {
+            Some(lb) => {
+                
+            },
+            _ => (),
+        }
+        
+        let ub_const = self.lp_problem.add_constraint(Constraint::new(ty, rhs, name, vars)).unwrap();
         
         let solution = self.lp_problem.solve_as(ProblemType::Linear);
         assignments.iter().enumerate().for_each(|(i, &val)| {
@@ -129,6 +143,20 @@ impl LPSolver {
                 self.lp_problem.unfix_variable(self.var_ids[i], 0.0, 1.0).unwrap();
             }
         });
+
+        println!("thread {:?} -- got solution obj {:?}", std::thread::current().id(), solution);
+        if let Ok(sol) = &solution {
+            if let Some(lb) = lb {
+                assert!(sol.objective_value() >= lb)
+            }
+        }
+
+        if let Ok(sol) = &solution {
+            if let Some(ub) = ub {
+                println!("thread {:?} -- BOUNDS ARE FUCKED solving with cost bounds [{lb:?}, {ub:?}]", std::thread::current().id());
+                assert!(sol.objective_value() <= ub)
+            }
+        }
 
         // TODO: think about how to add and unadd variables in more efficient way
 
