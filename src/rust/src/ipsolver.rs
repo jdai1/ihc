@@ -54,7 +54,7 @@ mod solver {
 
     #[derive(Debug)]
     pub enum WorkOrder {
-        VisitNode(Node),
+        VisitNode(Node, usize),
         NoMoreWork,
     }
 
@@ -62,7 +62,7 @@ mod solver {
     pub enum WorkResponse {
         IntegralSolution(Node),
         Infeasible,
-        NewActiveNode(Node)
+        NewActiveNode(Node, usize)
     }
 
     #[derive(Debug)]
@@ -151,7 +151,7 @@ mod solver {
                     if let Some(best_node) = self.active_nodes.pop() {
                         if (best_node.objective_val < self.current_incumbent_obj_val) {
                             // if better than current inc, enq to workqueue
-                            self.work_channel_send.send(WorkOrder::VisitNode(best_node));
+                            self.work_channel_send.send(WorkOrder::VisitNode(best_node, 0));
                             in_flight_nodes += 2; // bc we should get two responses from it...
                         } else {
                             // FIXME: think this is safe but should double check...
@@ -179,12 +179,17 @@ mod solver {
                                 self.current_incumbent = Some(sol);
                             }
                         },
-                        WorkResponse::NewActiveNode(node) => {
-                            // println!("manager -- got active node {node:?} back");
+                        WorkResponse::NewActiveNode(node, depth) => {
                             if node.objective_val < self.current_incumbent_obj_val {
                                 self.active_nodes.push(node)
-                            } else {
-                                // println!("manager -- pruned {:?} by not adding back to heap", node);
+                                // if (depth >= 2) {
+                                //     // add to active nodes if we're past depth
+                                    
+                                // } else {
+                                //     // otherwise send back to workers
+                                //     self.work_channel_send.send(WorkOrder::VisitNode(node, depth + 1));
+                                //     in_flight_nodes += 2;
+                                // }
                             }
                         },
                     }
@@ -341,11 +346,12 @@ fn get_branch_var(fixed: &Vec<FixedStatus>, lp_assignments: &Vec<f64>) -> usize 
     lp_assignments.iter().zip(fixed).enumerate().filter_map(|(i, (val, status))|{
         match status {
             FixedStatus::Unassigned => Some((i, -1.0 * (1.0 - val).abs())),
+            // FixedStatus::Unassigned => Some((i, lp_assignments.len() - i)),
             _ => None,
         }
     })
     .max_by(|(_, val1), (_, val2)| {
-        val1.total_cmp(val2)
+        val1.partial_cmp(val2).unwrap()
     }).map(|(index, _)| index).unwrap()
 }
 
@@ -403,8 +409,8 @@ mod worker {
                 self.stats.waiting_for_orders += start_wait.elapsed();
                 // println!("worker id {} -- got work order {:?}", self.id, order);
                 match order {
-                    WorkOrder::VisitNode(node) => {
-                        let vec_res = self.branch_and_visit_node(node);
+                    WorkOrder::VisitNode(node, depth) => {
+                        let vec_res = self.branch_and_visit_node(node, depth);
                         for res in vec_res {
                             // println!("worker id {} -- sending response {:?}", self.id, res);
                             self.work_response_send.send(res).unwrap();
@@ -417,17 +423,19 @@ mod worker {
             }
         }
 
-        pub fn branch_and_visit_node(&mut self, node: Node) -> Vec<WorkResponse> {
+        pub fn branch_and_visit_node(&mut self, node: Node, depth: usize) -> Vec<WorkResponse> {
+
+            println!("worker {:?} -- branching on node w/ obj {:?}", self.id, node.objective_val);
 
             let branch_var = get_branch_var(&node.fixed, &node.lp_assignments);
-            let a = self.search((branch_var, FixedStatus::Present), node.fixed.clone());
-            let b = self.search((branch_var, FixedStatus::Absent), node.fixed);
+            let a = self.search((branch_var, FixedStatus::Present), node.fixed.clone(), depth);
+            let b = self.search((branch_var, FixedStatus::Absent), node.fixed, depth);
 
             // return the work response from each subtree
             vec![a, b]
         }
 
-        fn search(&mut self, branch_assignment: (usize, FixedStatus), mut fixed: Vec<FixedStatus>) -> WorkResponse {
+        fn search(&mut self, branch_assignment: (usize, FixedStatus), mut fixed: Vec<FixedStatus>, depth: usize) -> WorkResponse {
             fixed[branch_assignment.0] = branch_assignment.1; // update the fixed 
 
             self.stats.solves += 1;
@@ -461,7 +469,7 @@ mod worker {
                 }
                 
                 // push to heap
-                return WorkResponse::NewActiveNode(this_node)
+                return WorkResponse::NewActiveNode(this_node, depth);
             } else {
                 // infeasible
                 return WorkResponse::Infeasible;

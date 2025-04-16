@@ -1,0 +1,14 @@
+{"Instance":"/Users/alexanderportland/Desktop/prescriptive/healthcare-analytics/input/100_100_0.25_1.ip","Result":153.0,"Solution":"OPT","Time":14.91}
+{"Instance":"/Users/alexanderportland/Desktop/prescriptive/healthcare-analytics/input/100_100_0.25_3.ip","Result":96.0,"Solution":"OPT","Time":2.67}
+{"Instance":"/Users/alexanderportland/Desktop/prescriptive/healthcare-analytics/input/100_100_0.5_3.ip","Result":71.0,"Solution":"OPT","Time":2.11}
+{"Instance":"/Users/alexanderportland/Desktop/prescriptive/healthcare-analytics/input/100_100_0.5_9.ip","Result":74.0,"Solution":"OPT","Time":2.02}
+{"Instance":"/Users/alexanderportland/Desktop/prescriptive/healthcare-analytics/input/100_200_0.5_5.ip","Result":86.0,"Solution":"OPT","Time":19.84}
+{"Instance":"/Users/alexanderportland/Desktop/prescriptive/healthcare-analytics/input/100_200_0.5_6.ip","Result":69.0,"Solution":"OPT","Time":18.19}
+{"Instance":"/Users/alexanderportland/Desktop/prescriptive/healthcare-analytics/input/100_50_0.5_2.ip","Result":72.0,"Solution":"OPT","Time":0.46}
+{"Instance":"/Users/alexanderportland/Desktop/prescriptive/healthcare-analytics/input/25_25_0.25_1.ip","Result":57.0,"Solution":"OPT","Time":0.01}
+{"Instance":"/Users/alexanderportland/Desktop/prescriptive/healthcare-analytics/input/25_25_0.5_1.ip","Result":30.0,"Solution":"OPT","Time":0.02}
+{"Instance":"/Users/alexanderportland/Desktop/prescriptive/healthcare-analytics/input/25_50_0.5_8.ip","Result":77.0,"Solution":"OPT","Time":0.11}
+{"Instance":"/Users/alexanderportland/Desktop/prescriptive/healthcare-analytics/input/50_100_0.5_4.ip","Result":103.0,"Solution":"OPT","Time":1.58}
+{"Instance":"/Users/alexanderportland/Desktop/prescriptive/healthcare-analytics/input/50_100_0.5_7.ip","Result":92.0,"Solution":"OPT","Time":1.86}
+{"Instance":"/Users/alexanderportland/Desktop/prescriptive/healthcare-analytics/input/50_25_0.5_1.ip","Result":37.0,"Solution":"OPT","Time":0.03}
+{"Instance":"/Users/alexanderportland/Desktop/prescriptive/healthcare-analytics/input/50_50_0.5_5.ip","Result":53.0,"Solution":"OPT","Time":0.12}
