@@ -178,9 +178,9 @@ mod solver {
                             in_flight_nodes += 2; // bc we should get two responses from it...
                         } else {
                             // FIXME: think this is safe but should double check...
-                            println!("pruned all {} active nodes below {:?}", self.active_nodes.len(), best_node);
-                            self.solver_stats.prunes += self.active_nodes.len();
-                            self.active_nodes.clear();
+                            // println!("pruned all {} active nodes below {:?}", self.active_nodes.len(), best_node);
+                            // self.solver_stats.prunes += self.active_nodes.len();
+                            // self.active_nodes.clear();
                         }
                     } else {
                         // println!("no work on heap!");
