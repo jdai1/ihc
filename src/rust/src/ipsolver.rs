@@ -29,9 +29,9 @@ pub mod common {
     impl Node {
         pub fn new(objective_val: f64, fixed: Vec<FixedStatus>, lp_assignments: Vec<f64>) -> Self {
             let normal = Normal::new(0.0, 2.0).unwrap();
-            let mut rng = thread_rng();
-            let noise: f64 = normal.sample(&mut rng);
-            // let noise = 0_f64;
+            // let mut rng = thread_rng();
+            // let noise: f64 = normal.sample(&mut rng);
+            let noise = 0_f64;
             Node { objective_val, fixed, lp_assignments, noise }
         }
 
@@ -84,12 +84,16 @@ mod solver {
         pub max_heap_size: usize,
         pub prunes: usize,
         pub total_solves: usize,
-        // pub 
+        pub res_infeasible: usize,
+        pub res_integral: usize,
+        pub res_integral_new_inc: usize,
+        pub res_active: usize,
+        pub res_active_pruned: usize,
     }
 
     impl Default for SolverStats {
         fn default() -> Self {
-            SolverStats { max_heap_size: 0, prunes: 0, total_solves: 0 }
+            SolverStats { max_heap_size: 0, prunes: 0, total_solves: 0, res_infeasible: 0, res_integral: 0, res_active: 0, res_active_pruned: 0, res_integral_new_inc: 0 }
         }
     }
 
@@ -188,17 +192,22 @@ mod solver {
                     // println!("manager -- got work response {:?}", work_res);
                     in_flight_nodes -= 1;
                     match work_res {
-                        WorkResponse::Infeasible => (),
+                        WorkResponse::Infeasible => {
+                            self.solver_stats.res_infeasible += 1;
+                        },
                         WorkResponse::IntegralSolution(sol) => {
+                            self.solver_stats.res_integral += 1;
                             // update incumbent if better
                             // println!("manager -- got integral node {sol:?} back");
                             if sol.objective_val < self.current_incumbent_obj_val {
+                                self.solver_stats.res_integral_new_inc += 1;
                                 println!("manager {:?} -- better incumbent found! {:?}", start.elapsed(), sol);
                                 self.current_incumbent_obj_val = sol.objective_val;
                                 self.current_incumbent = Some(sol);
                             }
                         },
                         WorkResponse::NewActiveNode(node, depth) => {
+                            self.solver_stats.res_active += 1;
                             if node.objective_val < self.current_incumbent_obj_val {
                                 self.active_nodes.push(node)
                                 // if (depth >= 2) {
@@ -209,6 +218,9 @@ mod solver {
                                 //     self.work_channel_send.send(WorkOrder::VisitNode(node, depth + 1));
                                 //     in_flight_nodes += 2;
                                 // }
+                            } else {
+                                self.solver_stats.res_active_pruned += 1;
+                                self.solver_stats.prunes += 1;
                             }
                         },
                     }
@@ -273,6 +285,7 @@ mod solver {
                 // println!("Objective value: {}", solution.objective_value());
                 if solution.objective_value() > self.current_incumbent_obj_val {
                     // PRUNE
+                    self.solver_stats.prunes += 1;
                     return;
                 }
 
