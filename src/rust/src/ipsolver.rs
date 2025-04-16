@@ -1,6 +1,9 @@
 
 
 pub mod common {
+    use rand::thread_rng;
+    use rand_distr::{Normal, Distribution};
+
     #[derive(PartialEq, Debug, Clone, Copy)]
     pub enum FixedStatus {
         Present,
@@ -18,11 +21,17 @@ pub mod common {
 
         // lp assignments
         pub lp_assignments: Vec<f64>,
+
+        // noise
+        pub noise: f64,
     }
 
     impl Node {
         pub fn new(objective_val: f64, fixed: Vec<FixedStatus>, lp_assignments: Vec<f64>) -> Self {
-            Node { objective_val, fixed, lp_assignments }
+            let normal = Normal::new(0.0, 2.0).unwrap();
+            let mut rng = thread_rng();
+            let noise: f64 = normal.sample(&mut rng);
+            Node { objective_val, fixed, lp_assignments, noise }
         }
 
         pub fn objective_value(&self) -> f64 { self.objective_val }
@@ -32,13 +41,17 @@ pub mod common {
 
     impl PartialOrd for Node {
         fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-            other.objective_val.partial_cmp(&self.objective_val)
+            let other_val = other.objective_val + other.noise;
+            let self_val = self.objective_val + self.noise;
+            other_val.partial_cmp(&self_val)
         }
     }
 
     impl Ord for Node {
         fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-            other.objective_val.total_cmp(&self.objective_val)
+            let other_val = other.objective_val + other.noise;
+            let self_val = self.objective_val + self.noise;
+            other_val.total_cmp(&self_val)
         }
     }
 }
@@ -92,6 +105,7 @@ mod solver {
     
     impl IPSolver {
         const NUM_WORKERS: usize = 8;
+        
         pub fn new(filename: &str) -> Self {
             // solve first thing ourselves and then add to active_nodes
             let (work_channel_send, work_channel_recv) = crossbeam::channel::unbounded();
@@ -352,8 +366,6 @@ fn get_branch_var(fixed: &Vec<FixedStatus>, lp_assignments: &Vec<f64>) -> usize 
 mod worker {
     use std::time::Duration;
     use std::time::Instant;
-
-    use crossbeam::channel::RecvError;
 
     use crate::lpsolver::LPSolver;
     use crate::ipsolver::FixedStatus;
