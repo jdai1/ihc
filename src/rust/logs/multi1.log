@@ -10,5 +10,3 @@
 {"Instance":"25_50_0.5_8.ip","Result":77.0,"Solution":"OPT","Time":0.11}
 {"Instance":"50_100_0.5_4.ip","Result":103.0,"Solution":"OPT","Time":1.58}
 {"Instance":"50_100_0.5_7.ip","Result":92.0,"Solution":"OPT","Time":1.47}
-{"Instance":"50_25_0.5_1.ip","Result":37.0,"Solution":"OPT","Time":0.03}
-{"Instance":"50_50_0.5_5.ip","Result":53.0,"Solution":"OPT","Time":0.14}
