@@ -180,7 +180,7 @@ mod solver {
                             // FIXME: think this is safe but should double check...
                             // println!("pruned all {} active nodes below {:?}", self.active_nodes.len(), best_node);
                             // self.solver_stats.prunes += self.active_nodes.len();
-                            // self.active_nodes.clear();
+                            self.active_nodes.retain(|n| n.objective_val < self.current_incumbent_obj_val);
                         }
                     } else {
                         // println!("no work on heap!");
