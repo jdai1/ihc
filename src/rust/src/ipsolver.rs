@@ -47,7 +47,7 @@ pub use solver::IPSolver;
 
 mod solver {
     use crate::ipsolver::get_branch_var;
-    use std::{collections::BinaryHeap, thread::{current, JoinHandle}};
+    use std::{collections::BinaryHeap, thread::{current, JoinHandle}, time::Instant};
     use crate::lpsolver::{self, LPSolver, ProblemInstance};
 
     use super::{common::{FixedStatus, Node}, worker::{Worker, WorkerStats}};
@@ -138,6 +138,7 @@ mod solver {
         const KEEP_IN_CHANNEL: usize = 1;
         pub fn solve(mut self) -> IPSolveResult {
             // solve first
+            let start = Instant::now();
             self.solve_initial_node();
 
             let mut in_flight_nodes = 0;
@@ -173,7 +174,7 @@ mod solver {
                             // update incumbent if better
                             // println!("manager -- got integral node {sol:?} back");
                             if sol.objective_val < self.current_incumbent_obj_val {
-                                // println!("manager -- better incumbent found! {:?}", sol);
+                                println!("manager {:?} -- better incumbent found! {:?}", start.elapsed(), sol);
                                 self.current_incumbent_obj_val = sol.objective_val;
                                 self.current_incumbent = Some(sol);
                             }
@@ -210,7 +211,10 @@ mod solver {
             }).collect::<Vec<_>>();
 
             println!("my stats are {:?}", self.solver_stats);
-            println!("worker stats are {:?}", worker_stats);
+            println!("workers:");
+            for (i, worker) in worker_stats.iter().enumerate() {
+                println!("\tworker {i} -- {worker:?}");
+            }
             
             return (self.current_incumbent_obj_val, self.current_incumbent.unwrap().lp_assignments);
 
@@ -284,18 +288,18 @@ mod solver {
                 let new_work_channel_recv = work_channel_recv.clone();
                 let new_work_response_send = work_response_send.clone();
 
-                println!("making worker id {worker_id:?}");
+                // println!("making worker id {worker_id:?}");
 
                 
 
-                println!("bound worker {worker_id:?} to core {core_id:?}");
+                // println!("bound worker {worker_id:?} to core {core_id:?}");
                 let filename = filename.to_string();
                 let new_core = core_id.to_owned();
                 std::thread::spawn(move ||{
                     let res = core_affinity::set_for_current(new_core);
                     // will fail for macOS but not on linux i think...
 
-                    println!("binding thread {:?} to core {:?} had res {res:?}", current().id(), new_core);
+                    println!("binding worker thread {:?} to core {:?} (res {res:?})", current().id(), new_core);
 
                     Worker::new(worker_id, new_work_channel_recv, new_work_response_send, LPSolver::new(&filename)).run()
                 })
@@ -336,7 +340,7 @@ use crate::ipsolver::common::FixedStatus;
 fn get_branch_var(fixed: &Vec<FixedStatus>, lp_assignments: &Vec<f64>) -> usize {
     lp_assignments.iter().zip(fixed).enumerate().filter_map(|(i, (val, status))|{
         match status {
-            FixedStatus::Unassigned => Some((i, 1.0 - val)),
+            FixedStatus::Unassigned => Some((i, -1.0 * (1.0 - val).abs())),
             _ => None,
         }
     })
@@ -431,7 +435,7 @@ mod worker {
             let start_solve = Instant::now();
             let res = self.lp_solver.solve(&fixed);
             self.stats.lp_solving += start_solve.elapsed();
-            
+
             let solution = match res {
                 Err(e) => {
                     match e {
