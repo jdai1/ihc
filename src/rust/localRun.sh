@@ -13,6 +13,6 @@ fi
 # For Mac M1 Env; Assumes CPLEX installation from cs2951o (i.e. x86 binary)
 
 input=$1
-export LD_LIBRARY_PATH=/course/cs2951o/ilog/CPLEX_Studio2211/cplex/bin/x86-64_linux
-export CPLEX_PATH=/course/cs2951o/ilog/CPLEX_Studio2211/cplex
-cargo run --release -- $1
+export DYLD_LIBRARY_PATH=/Applications/CPLEX_Studio2211/cplex/bin/x86-64_osx 
+export CPLEX_PATH=/Applications/CPLEX_Studio2211/cplex 
+cargo run --release --target x86_64-apple-darwin -- $1
