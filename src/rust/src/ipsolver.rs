@@ -69,7 +69,7 @@ mod solver {
 
     #[derive(Debug)]
     pub enum WorkOrder {
-        VisitNode(Node),
+        VisitNode(Node, usize),
         NoMoreWork,
     }
 
@@ -77,17 +77,24 @@ mod solver {
     pub enum WorkResponse {
         IntegralSolution(Node),
         Infeasible,
-        NewActiveNode(Node)
+        NewActiveNode(Node, i32)
     }
 
     #[derive(Debug)]
     pub struct SolverStats {
         pub max_heap_size: usize,
+        pub prunes: usize,
+        pub total_solves: usize,
+        pub res_infeasible: usize,
+        pub res_integral: usize,
+        pub res_integral_new_inc: usize,
+        pub res_active: usize,
+        pub res_active_pruned: usize,
     }
 
     impl Default for SolverStats {
         fn default() -> Self {
-            SolverStats { max_heap_size: 0 }
+            SolverStats { max_heap_size: 0, prunes: 0, total_solves: 0, res_infeasible: 0, res_integral: 0, res_active: 0, res_active_pruned: 0, res_integral_new_inc: 0 }
         }
     }
 
@@ -167,11 +174,12 @@ mod solver {
                     if let Some(best_node) = self.active_nodes.pop() {
                         if (best_node.objective_val < self.current_incumbent_obj_val) {
                             // if better than current inc, enq to workqueue
-                            self.work_channel_send.send(WorkOrder::VisitNode(best_node));
+                            self.work_channel_send.send(WorkOrder::VisitNode(best_node, 0));
                             in_flight_nodes += 2; // bc we should get two responses from it...
                         } else {
                             // FIXME: think this is safe but should double check...
-                            println!("pruned all active nodes below {:?}", best_node);
+                            println!("pruned all {} active nodes below {:?}", self.active_nodes.len(), best_node);
+                            self.solver_stats.prunes += self.active_nodes.len();
                             self.active_nodes.clear();
                         }
                     } else {
@@ -185,22 +193,35 @@ mod solver {
                     // println!("manager -- got work response {:?}", work_res);
                     in_flight_nodes -= 1;
                     match work_res {
-                        WorkResponse::Infeasible => (),
+                        WorkResponse::Infeasible => {
+                            self.solver_stats.res_infeasible += 1;
+                        },
                         WorkResponse::IntegralSolution(sol) => {
+                            self.solver_stats.res_integral += 1;
                             // update incumbent if better
                             // println!("manager -- got integral node {sol:?} back");
                             if sol.objective_val < self.current_incumbent_obj_val {
+                                self.solver_stats.res_integral_new_inc += 1;
                                 println!("manager {:?} -- better incumbent found! {:?}", start.elapsed(), sol);
                                 self.current_incumbent_obj_val = sol.objective_val;
                                 self.current_incumbent = Some(sol);
                             }
                         },
-                        WorkResponse::NewActiveNode(node) => {
-                            // println!("manager -- got active node {node:?} back");
+                        WorkResponse::NewActiveNode(node, depth) => {
+                            self.solver_stats.res_active += 1;
                             if node.objective_val < self.current_incumbent_obj_val {
                                 self.active_nodes.push(node)
+                                // if (depth >= 2) {
+                                //     // add to active nodes if we're past depth
+                                    
+                                // } else {
+                                //     // otherwise send back to workers
+                                //     self.work_channel_send.send(WorkOrder::VisitNode(node, depth + 1));
+                                //     in_flight_nodes += 2;
+                                // }
                             } else {
-                                // println!("manager -- pruned {:?} by not adding back to heap", node);
+                                self.solver_stats.res_active_pruned += 1;
+                                self.solver_stats.prunes += 1;
                             }
                         },
                     }
@@ -226,6 +247,7 @@ mod solver {
                 join_handle.join().unwrap()
             }).collect::<Vec<_>>();
 
+            self.solver_stats.total_solves = worker_stats.iter().map(|s|s.solves).sum();
             println!("my stats are {:?}", self.solver_stats);
             println!("workers:");
             for (i, worker) in worker_stats.iter().enumerate() {
@@ -264,6 +286,7 @@ mod solver {
                 // println!("Objective value: {}", solution.objective_value());
                 if solution.objective_value() > self.current_incumbent_obj_val {
                     // PRUNE
+                    self.solver_stats.prunes += 1;
                     return;
                 }
 
@@ -357,11 +380,12 @@ fn get_branch_var(fixed: &Vec<FixedStatus>, lp_assignments: &Vec<f64>) -> usize 
     lp_assignments.iter().zip(fixed).enumerate().filter_map(|(i, (val, status))|{
         match status {
             FixedStatus::Unassigned => Some((i, -1.0 * (1.0 - val).abs())),
+            // FixedStatus::Unassigned => Some((i, lp_assignments.len() - i)),
             _ => None,
         }
     })
     .max_by(|(_, val1), (_, val2)| {
-        val1.total_cmp(val2)
+        val1.partial_cmp(val2).unwrap()
     }).map(|(index, _)| index).unwrap()
 }
 
@@ -417,8 +441,8 @@ mod worker {
                 self.stats.waiting_for_orders += start_wait.elapsed();
                 // println!("worker id {} -- got work order {:?}", self.id, order);
                 match order {
-                    WorkOrder::VisitNode(node) => {
-                        let vec_res = self.branch_and_visit_node(node);
+                    WorkOrder::VisitNode(node, depth) => {
+                        let vec_res = self.branch_and_visit_node(node, depth);
                         for res in vec_res {
                             // println!("worker id {} -- sending response {:?}", self.id, res);
                             self.work_response_send.send(res).unwrap();
@@ -431,7 +455,9 @@ mod worker {
             }
         }
 
-        pub fn branch_and_visit_node(&mut self, node: Node) -> Vec<WorkResponse> {
+        pub fn branch_and_visit_node(&mut self, node: Node, depth: usize) -> Vec<WorkResponse> {
+
+            println!("worker {:?} -- branching on node w/ obj {:?}", self.id, node.objective_val);
 
             let branch_var = get_branch_var(&node.fixed, &node.lp_assignments);
             let a = self.search((branch_var, FixedStatus::Present), node.fixed.clone(), node.depth);
@@ -475,7 +501,7 @@ mod worker {
                 }
                 
                 // push to heap
-                return WorkResponse::NewActiveNode(this_node)
+                return WorkResponse::NewActiveNode(this_node, depth);
             } else {
                 // infeasible
                 return WorkResponse::Infeasible;
