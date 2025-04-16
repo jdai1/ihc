@@ -31,6 +31,7 @@ pub mod common {
             let normal = Normal::new(0.0, 2.0).unwrap();
             let mut rng = thread_rng();
             let noise: f64 = normal.sample(&mut rng);
+            // let noise = 0_f64;
             Node { objective_val, fixed, lp_assignments, noise }
         }
 
@@ -81,11 +82,14 @@ mod solver {
     #[derive(Debug)]
     pub struct SolverStats {
         pub max_heap_size: usize,
+        pub prunes: usize,
+        pub total_solves: usize,
+        // pub 
     }
 
     impl Default for SolverStats {
         fn default() -> Self {
-            SolverStats { max_heap_size: 0 }
+            SolverStats { max_heap_size: 0, prunes: 0, total_solves: 0 }
         }
     }
 
@@ -169,7 +173,8 @@ mod solver {
                             in_flight_nodes += 2; // bc we should get two responses from it...
                         } else {
                             // FIXME: think this is safe but should double check...
-                            println!("pruned all active nodes below {:?}", best_node);
+                            println!("pruned all {} active nodes below {:?}", self.active_nodes.len(), best_node);
+                            self.solver_stats.prunes += self.active_nodes.len();
                             self.active_nodes.clear();
                         }
                     } else {
@@ -229,6 +234,7 @@ mod solver {
                 join_handle.join().unwrap()
             }).collect::<Vec<_>>();
 
+            self.solver_stats.total_solves = worker_stats.iter().map(|s|s.solves).sum();
             println!("my stats are {:?}", self.solver_stats);
             println!("workers:");
             for (i, worker) in worker_stats.iter().enumerate() {
