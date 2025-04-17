@@ -1,5 +1,5 @@
 use cplex_rs::{
-    Constraint, ConstraintType, Environment, ObjectiveType, Problem, ProblemType, Solution, Variable, VariableId, VariableType
+    Constraint, ConstraintId, ConstraintType, Environment, ObjectiveType, Problem, ProblemType, Solution, Variable, VariableId, VariableType
 };
 use cplex_rs::parameters::Threads;
 use std::fs::File;
@@ -52,7 +52,8 @@ pub struct LPSolver {
     problem_instance: ProblemInstance,
     table: Vec<Vec<usize>>,
     lp_problem: Problem,
-    var_ids: Vec<VariableId>
+    var_ids: Vec<VariableId>,
+    objective_func_exp: Vec<(VariableId, f64)>
 }
 
 impl LPSolver {
@@ -99,11 +100,11 @@ impl LPSolver {
             problem.add_constraint(Constraint::new(ConstraintType::GreaterThanEq, 1.0, None, var_and_coeffs)).unwrap();
         }
 
-        let objective_func: Vec<(VariableId, f64)> = (0..inst.num_tests)
+        let objective_func_exp: Vec<(VariableId, f64)> = (0..inst.num_tests)
             .map(|x| (var_ids[x], inst.cost[x] as f64))
             .collect();
         let problem = problem
-            .set_objective(ObjectiveType::Minimize, objective_func)
+            .set_objective(ObjectiveType::Minimize, objective_func_exp.clone())
             .unwrap();
 
         LPSolver {
@@ -111,6 +112,7 @@ impl LPSolver {
             table: table,
             lp_problem: problem,
             var_ids: var_ids,
+            objective_func_exp: objective_func_exp
         }
     }
 
@@ -124,18 +126,18 @@ impl LPSolver {
             }
         });
 
-        let res = if let Some(lb) = lb {
-            let ub_const = self.lp_problem.add_constraint(Constraint::new(ConstraintType::GreaterThanEq, lb, None, var_and_coeffs)).unwrap();
-            Some(ub_const)
-        } else { None };
-        match lb {
-            Some(lb) => {
-                
-            },
-            _ => (),
+        let mut lb_cid: Option<ConstraintId> = None;
+        let mut ub_cid: Option<ConstraintId> = None;
+        if lb.is_some() {
+            lb_cid = Some(self.lp_problem.add_constraint(Constraint::new(ConstraintType::GreaterThanEq, lb.unwrap(), None, self.objective_func_exp.clone())).unwrap());
+            println!("lb_cid pre: {:?}", lb_cid);
+        }
+        if ub.is_some() {
+            ub_cid = Some(self.lp_problem.add_constraint(Constraint::new(ConstraintType::LessThanEq, ub.unwrap(), None, self.objective_func_exp.clone())).unwrap());
+            println!("ub_cid pre: {:?}", lb_cid);
         }
         
-        let ub_const = self.lp_problem.add_constraint(Constraint::new(ty, rhs, name, vars)).unwrap();
+        
         
         let solution = self.lp_problem.solve_as(ProblemType::Linear);
         assignments.iter().enumerate().for_each(|(i, &val)| {
@@ -143,6 +145,14 @@ impl LPSolver {
                 self.lp_problem.unfix_variable(self.var_ids[i], 0.0, 1.0).unwrap();
             }
         });
+        if lb_cid.is_some() {
+            println!("lb_cid post: {:?}", lb_cid.unwrap());
+            self.lp_problem.remove_constraint(lb_cid.unwrap()).unwrap();
+        }
+        if ub_cid.is_some() {
+            println!("ub_cid post: {:?}", ub_cid.unwrap());
+            self.lp_problem.remove_constraint(ub_cid.unwrap()).unwrap();
+        }
 
         println!("thread {:?} -- got solution obj {:?}", std::thread::current().id(), solution);
         if let Ok(sol) = &solution {

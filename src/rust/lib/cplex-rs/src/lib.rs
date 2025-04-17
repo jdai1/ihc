@@ -35,10 +35,10 @@ pub use environment::*;
 pub use errors::{Error, Result};
 pub use ffi;
 use ffi::{
-    cpxlp, CPX_STAT_INForUNBD, CPXchgbds, CPXaddmipstarts, CPXaddrows, CPXchgobj, CPXchgobjsen,
-    CPXchgprobtype, CPXcreateprob, CPXfreeprob, CPXgetobjval, CPXgetstat, CPXgetx, CPXlpopt,
-    CPXmipopt, CPXnewcols, CPXwriteprob, CPXMIP_UNBOUNDED, CPXPROB_LP, CPXPROB_MILP, CPX_MAX,
-    CPX_MIN, CPX_STAT_INFEASIBLE, CPX_STAT_UNBOUNDED,
+    cpxlp, CPX_STAT_INForUNBD, CPXaddmipstarts, CPXaddrows, CPXchgbds, CPXchgobj, CPXchgobjsen,
+    CPXchgprobtype, CPXcreateprob, CPXdelrows, CPXfreeprob, CPXgetobjval, CPXgetstat, CPXgetx,
+    CPXlpopt, CPXmipopt, CPXnewcols, CPXwriteprob, CPXMIP_UNBOUNDED, CPXPROB_LP, CPXPROB_MILP,
+    CPX_MAX, CPX_MIN, CPX_STAT_INFEASIBLE, CPX_STAT_UNBOUNDED,
 };
 use log::debug;
 pub use solution::*;
@@ -156,7 +156,7 @@ impl Problem {
         let bound_type = vec![lb, ub];
         let indices = vec![idx, idx];
         let values = vec![value, value];
-    
+
         macros::cpx_lp_result!(unsafe {
             CPXchgbds(
                 self.env.inner,
@@ -170,14 +170,19 @@ impl Problem {
     }
 
     // Julian Dai — 4/15/2025
-    pub fn unfix_variable(&mut self, var: VariableId, original_lb: f64, original_ub: f64) -> Result<()> {
+    pub fn unfix_variable(
+        &mut self,
+        var: VariableId,
+        original_lb: f64,
+        original_ub: f64,
+    ) -> Result<()> {
         let idx = var.into_inner() as c_int;
         let lb = 'L' as i8;
         let ub = 'U' as i8;
         let bound_type = vec![lb, ub];
         let indices = vec![idx, idx];
         let values = vec![original_lb, original_ub];
-    
+
         macros::cpx_lp_result!(unsafe {
             CPXchgbds(
                 self.env.inner,
@@ -189,7 +194,7 @@ impl Problem {
             )
         })
     }
-    
+
     /// Add a variable to the problem.
     ///
     /// The id for the Variable is returned.
@@ -302,6 +307,15 @@ impl Problem {
         let index = self.constraints.len();
         self.constraints.push(constraint);
         Ok(ConstraintId(index))
+    }
+
+    // Julian Dai
+    pub fn remove_constraint(&mut self, cid: ConstraintId) -> Result<()> {
+        let idx = cid.into_inner() as c_int;
+
+        macros::cpx_lp_result!(unsafe { CPXdelrows(self.env.inner, self.inner, idx, idx) })?;
+
+        Ok(())
     }
 
     /// Add an array of constraints to the problem.
