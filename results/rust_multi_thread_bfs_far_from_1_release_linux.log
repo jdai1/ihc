@@ -1,0 +1,16 @@
+{"Instance":"/ifs/CS/replicated/home/jkdai/cs2951o/ihc/input/100_100_0.25_1.ip","Result":153.0,"Solution":"OPT","Time":11.58}
+{"Instance":"/ifs/CS/replicated/home/jkdai/cs2951o/ihc/input/100_100_0.25_3.ip","Result":96.0,"Solution":"OPT","Time":2.95}
+{"Instance":"/ifs/CS/replicated/home/jkdai/cs2951o/ihc/input/100_100_0.5_3.ip","Result":71.0,"Solution":"OPT","Time":2.87}
+{"Instance":"/ifs/CS/replicated/home/jkdai/cs2951o/ihc/input/100_100_0.5_9.ip","Result":74.0,"Solution":"OPT","Time":2.76}
+{"Instance": "100_200_0.5_5.ip", "Time": "--", "Result": "--"}
+{"Instance": "100_200_0.5_6.ip", "Time": "--", "Result": "--"}
+{"Instance":"/ifs/CS/replicated/home/jkdai/cs2951o/ihc/input/100_50_0.5_2.ip","Result":72.0,"Solution":"OPT","Time":0.55}
+{"Instance":"/ifs/CS/replicated/home/jkdai/cs2951o/ihc/input/25_25_0.25_1.ip","Result":57.0,"Solution":"OPT","Time":0.06}
+{"Instance":"/ifs/CS/replicated/home/jkdai/cs2951o/ihc/input/25_25_0.5_1.ip","Result":30.0,"Solution":"OPT","Time":0.05}
+{"Instance":"/ifs/CS/replicated/home/jkdai/cs2951o/ihc/input/25_50_0.5_8.ip","Result":77.0,"Solution":"OPT","Time":0.12}
+{"Instance":"/ifs/CS/replicated/home/jkdai/cs2951o/ihc/input/50_100_0.5_4.ip","Result":103.0,"Solution":"OPT","Time":1.47}
+{"Instance":"/ifs/CS/replicated/home/jkdai/cs2951o/ihc/input/50_100_0.5_7.ip","Result":92.0,"Solution":"OPT","Time":1.41}
+{"Instance":"/ifs/CS/replicated/home/jkdai/cs2951o/ihc/input/50_25_0.5_1.ip","Result":37.0,"Solution":"OPT","Time":0.08}
+{"Instance":"/ifs/CS/replicated/home/jkdai/cs2951o/ihc/input/50_50_0.5_5.ip","Result":53.0,"Solution":"OPT","Time":0.2}
+{"Instance":"/ifs/CS/replicated/home/jkdai/cs2951o/ihc/input/toy2.ip","Result":15.0,"Solution":"OPT","Time":0.05}
+{"Instance":"/ifs/CS/replicated/home/jkdai/cs2951o/ihc/input/toy.ip","Result":10.0,"Solution":"OPT","Time":0.05}
