@@ -10,13 +10,11 @@ then
 	exit $E_BADARGS
 fi
 
+# For Mac M1 Env; Assumes CPLEX installation from cs2951o (i.e. x86 binary)
+
 input=$1
-
-# TODO: Modify back to original
-
-# source p4_venv/bin/activate || exit 1
-# change this to point to your local installation
-# CHANGE it back to this value before submitting
-# export DOCPLEX_COS_LOCATION=/course/cs2951o/ilog/CPLEX_Studio2211/CPLEX_Studio2211
-# run the solver
-python3 main.py $input
+cd src/rust
+export LD_LIBRARY_PATH=/course/cs2951o/ilog/CPLEX_Studio2211/cplex/bin/x86-64_linux
+export CPLEX_PATH=/course/cs2951o/ilog/CPLEX_Studio2211/cplex
+cargo run --release -- $1
+cd ../..
