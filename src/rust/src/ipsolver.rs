@@ -43,17 +43,19 @@ pub mod common {
 
     impl PartialOrd for Node {
         fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-            let other_val = (other.objective_val + other.noise) * 0.99_f64.powi(other.depth);
-            let self_val = (self.objective_val + self.noise) * 0.99_f64.powi(self.depth);
-            other_val.partial_cmp(&self_val)
+            // let other_val = (other.objective_val + other.noise) * 0.99_f64.powi(other.depth);
+            // let self_val = (self.objective_val + self.noise) * 0.99_f64.powi(self.depth);
+            // other_val.partial_cmp(&self_val)
+            other.objective_val.partial_cmp(&self.objective_val)
         }
     }
 
     impl Ord for Node {
         fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-            let other_val = (other.objective_val + other.noise) * 0.99_f64.powi(other.depth);
-            let self_val = (self.objective_val + self.noise) * 0.99_f64.powi(self.depth);
-            other_val.total_cmp(&self_val)
+            // let other_val = (other.objective_val + other.noise) * 0.99_f64.powi(other.depth);
+            // let self_val = (self.objective_val + self.noise) * 0.99_f64.powi(self.depth);
+            // other_val.total_cmp(&self_val)
+            other.objective_val.total_cmp(&self.objective_val)
         }
     }
 }
